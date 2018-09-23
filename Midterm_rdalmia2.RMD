@@ -1,0 +1,221 @@
+---
+title: "An Analysis of Abalone Data"
+author: "Rohan Dalmia (NETID - rdalmia2)"
+date: "October 30, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+##Background
+According to Wikipedia, Abalone is a common name for any of a group of small to very large sea snails, marine gastropod molluscs in the family Haliotidae. The dataset is an updated version of a study conducted by a team of scientists in 1994. The age of abalone is determined by cutting the shell through the cone, staining it, and counting the number of rings through a microscope. Other physical measurements, which are easier to obtain, can be used to predict the age.
+
+##Description
+The dataset contains 3977 observations and 9 variables. From the original data, examples with missing values were removed, and the ranges of the continuous values have been scaled for easier use with other statistical methods. 
+Variables in order:
+
+`Sex` - M, F, and I (infant)
+
+`Length` - longest shell measurement (mm)
+
+`Diameter` - measured perpendicular to length (mm)
+
+`Height` - with meat in shell (mm)
+
+`Whole` - whole abalone weight (g)
+
+`Shucked` - weight of meat only (g)
+
+`Viscera` - gut weight, after bleeding (g)
+
+`Shell` - weight after being dried (g)
+
+`Rings` - +1.5 gives the age in years
+
+##Procedure
+I decided to first observe the data and generate any meaningful insights if possible. I observed that Whole is almost equal to the sum of Shucked, Viscera and Shell. Therefore, there is a linear relationship between them and instead of using the 4 of them together, we can consider using either whole or Shucked, Viscera and Shell together. After that, I planned to start with the full model and perform F-test and single-test in order to find the not significant predictors. Then, I compared the two models, the one with Whole and the other with Shucked, Viscera and Shell, on the basis of their RMSE and R Squared values. This helped me in reducing the model and coming to the conclusion.
+
+##Steps
+
+
+###1)Reading the Data
+
+```{r}
+abalone_train <- data.frame(read.table("abalone_train.dat", header = TRUE,  sep = ","))
+colnames(abalone_train) <- c("Sex", "Length" , "Diameter" , "Height" , "Whole" , "Shucked" , "Viscera" , "Shell" , "Rings")
+```
+
+###2)Reporting the full model with summary
+
+```{r}
+library(broom)
+abalone_model = lm(Rings ~  Length + Diameter + Height + Whole + Shucked + Viscera + Shell , data = abalone_train)
+summary(abalone_model)
+```
+In this model, there are $9$ predictors.
+
+- $H_0: \beta_1 = \beta_2 = \cdots = \beta_{9} = 0$
+- $H_1: \text{At least one of } \beta_j \neq 0, j = 1, 2, 3, \cdots , 9$
+- Test statistic: $F = `r glance(abalone_model)$statistic`$
+- P-value: $`r glance(abalone_model)$p.value`$. Although, not actually $0$, but very small.
+- Decision: **Reject** $H_0$ at $\alpha = 0.01$.
+- Conclusion: There is a linear relationship between Rings and at least one of the predictor variables.
+
+**Out of all the main effects of this model, Length is the only variable that is not significant as the p-value is too high. Therefore, we make a model without Length and compare it with the full model to check if Length is significant or not.** 
+
+###3) Comparing full model with the one without Length
+```{r}
+coefficients(abalone_model)
+plot(abalone_model)
+model_wl = lm(Rings ~ Diameter + Height + Whole + Shucked + Viscera + Shell , data = abalone_train)
+anova(model_wl, abalone_model)
+```
+
+- $H_0: \beta_{Length} = 0$
+- $H_1: \beta_{Length} \neq 0$
+- Test statistic: $F = `r tidy(anova(model_wl, abalone_model))[2,]$statistic`$
+- P-value: $`r tidy(anova(model_wl, abalone_model))[2,]$p.value`$.
+- Decision: **Reject** $H_0$ at $\alpha = 0.01$.
+- Conclusion: The linear relationship between Rings and predictors is explained better by not including 'Length' in the model.
+
+###4)Reporting the summary of reduced model
+
+```{r}
+summary(model_wl)
+```
+
+In this model, there are $6$ predictors.
+
+- $H_0: \beta_1 = \beta_2 = \cdots = \beta_{6} = 0$
+- $H_1: \text{At least one of } \beta_j \neq 0, j = 1, 2, 3, \cdots , 6$
+- Test statistic: $F = `r glance(model_wl)$statistic`$
+- P-value: $`r glance(model_wl)$p.value`$. Although, not actually $0$, but very small.
+- Decision: **Reject** $H_0$ at $\alpha = 0.01$.
+- Conclusion: There is a linear relationship between Rings and at least one of the predictor variables.
+
+###5) From the insight we generated, testing the significance of Whole predictor variable with Height and Diameter
+
+```{r}
+abalone_w = lm(Rings ~ Height + Diameter + Whole , data = abalone_train)
+summary(abalone_w)
+```
+
+
+In this model, there are $3$ predictors.
+
+- $H_0: \beta_1 = \beta_2 = \beta_{3} = 0$
+- $H_1: \text{At least one of } \beta_j \neq 0, j = 1, 2, 3$
+- Test statistic: $F = `r glance(abalone_w)$statistic`$
+- P-value: $`r glance(abalone_w)$p.value`$. Although, not actually $0$, but very small.
+- Decision: **Reject** $H_0$ at $\alpha = 0.01$.
+- Conclusion: There is a linear relationship between Rings and at least one of Height, Diameter and Whole.
+
+**Out of all the main effects of this model, 'Whole' is the only varible that is not significant as the p-value is too high. Therefore, we make a model without 'Whole' and compare the it with 'abalone_w' model to check if Whole is significant or not. **
+
+###6) Comparing abalone_w with the model without Whole
+```{r}
+model_ww = lm(Rings ~ Height + Diameter, data = abalone_train)
+anova(model_ww , abalone_w)
+```
+
+- $H_0: \beta_{Whole} = 0$
+- $H_1: \beta_{Whole} \neq 0$
+- Test statistic: $F = `r tidy(anova(model_ww , abalone_w))[2,]$statistic`$
+- P-value: $`r tidy(anova(model_ww , abalone_w))[2,]$p.value`$.
+- Decision: **Reject** $H_0$ at $\alpha = 0.01$.
+- Conclusion: The linear relationship between Rings and predictors is explained better by not including Whole in the model.
+
+###7) From the insight we generated, testing the significance of Shell, Shucked and Viscera predictor variables with Height and Diameter
+
+```{r}
+abalone_ssv = lm(Rings ~ Height + Diameter + Shucked + Shell + Viscera , data = abalone_train)
+summary(abalone_ssv)
+```
+In this model, there are $5$ predictors.
+
+- $H_0: \beta_1 = \beta_2 = \cdots = \beta_{5} = 0$
+- $H_1: \text{At least one of } \beta_j \neq 0, j = 1, 2, \cdots , 5$
+- Test statistic: $F = `r glance(abalone_ssv)$statistic`$
+- P-value: $`r glance(abalone_ssv)$p.value`$. Although, not actually $0$, but very small.
+- Decision: **Reject** $H_0$ at $\alpha = 0.01$.
+- Conclusion: There is a linear relationship between Rings and at least one of the predictor variables.
+
+**Out of all the main effects of this model, 'Viscera' is the only varible that is not significant as the p-value is to high. Therefore, we make a model without 'Viscera' and compare it to abalone_ssv to check if Viscera is significant or not.** 
+
+###8) Comparing full model with the one without Viscera
+```{r}
+model_wv = lm(Rings ~ Height + Diameter + Shucked + Shell, data = abalone_train)
+anova(model_wv, abalone_ssv)
+```
+
+- $H_0: \beta_{Viscera} = 0$
+- $H_1: \beta_{Viscera} \neq 0$
+- Test statistic: $F = `r tidy(anova(model_wv, abalone_ssv))[2,]$statistic`$
+- P-value: $`r tidy(anova(model_wv, abalone_ssv))[2,]$p.value`$.
+- Decision: **Reject** $H_0$ at $\alpha = 0.01$.
+- Conclusion: The linear relationship between Rings and predictors is explained better by not including Viscera in the model.
+
+###9) Comparing the two models, namely model_ww and model_wv, to find the better one
+
+**This can be done by comparing the RMSE and Coefficient of Determination values of the two models**
+
+```{r}
+ifelse((rmse = sqrt(mean(resid(model_wv) ^ 2)))<(rmse = sqrt(mean(resid(model_ww) ^ 2))) & glance(model_wv)$r.squared > glance(model_ww)$r.squared , "Model without Viscera is better" , "Model without Whole is better")
+```
+
+###10)Printing the Final Model, i.e model_wv
+
+```{r}
+summary(model_wv)
+```
+In this model, there are $4$ predictors.
+
+- $H_0: \beta_{Height} = \beta_{Diameter} = \beta_{Shucked} = \beta_{Shell} = 0$
+- $H_1: \text{At least one of } \beta_{Height}, \beta_{Diameter}, \beta_{Shucked}, \beta_{Shell} \neq 0$
+- Test statistic: $F = `r glance(model_wv)$statistic`$
+- P-value: $`r glance(model_wv)$p.value`$. Although, not actually $0$, but very small.
+- Decision: **Reject** $H_0$ at $\alpha = 0.01$.
+- Conclusion: There is a linear relationship between Rings and at least one of Height, Diamater, Shucked and Shell.
+
+##Final Model Chosen##
+
+Rings = 2.743256 +  11.612363$x_{Height}$ + 12.023432$x_{Diameter} + 20.671658$x_{Shell} - 11.773108$x_{Shucked}
+
+##Interpretation##
+
+```{r}
+coefficients(model_wv)
+```
+
+$\hat{\beta_0}$ = 2.743256 is the estimated Rings of an abalone when Diameter of 0mm, Height of 0 mm, Shucked of 0 g, and Shell of 0 g.
+
+$\hat{\beta_{Height}}$ = 11.612363 is the estimated change in mean Rings for an increase of 1 mm Diamater for an abalone with a certain Height, Shucked, and Shell value.
+
+$\hat{\beta_{Diameter}}$ = 12.023432 is the estimated change in mean Rings for an increase of 1 mm Height for an abalone with a certain Diameter, Shucked, and Shell value.
+
+$\hat{\beta_{Shucked}}$ = -11.773108 is the estimated change in mean Rings for an increase of 1 g Shucked for an abalone with a certain Diameter, Height, and Shell value.
+
+$\hat{\beta_{Shell}}$ = 20.671658  is the estimated change in mean Rings for an increase of 1 g Shell for an abalone with a certain Diameter, Height, and Shucked value.
+
+##Testing the Model on test dataset##
+
+```{r}
+abalone_test = data.frame(read.table("abalone_test.dat", header = TRUE,  sep = ","))
+colnames(abalone_test) <- c("Sex", "Length" , "Diameter" , "Height" , "Whole" , "Shucked" , "Viscera" , "Shell" , "Rings")
+obs = nrow(abalone_test)
+rings = rep(0,obs)
+for(i in 1:obs){
+  height = abalone_test[i,4]
+  diameter = abalone_test[i,3]
+  shucked = abalone_test[i,6]
+  shell = abalone_test[i,8]
+  rings[i] =  2.743256 +  11.612363*height + 12.023432*diameter + 20.671658*shell - 11.773108*shucked
+}
+error = abalone_test[,9] - rings
+mean(error)
+sd(error)
+```
+
